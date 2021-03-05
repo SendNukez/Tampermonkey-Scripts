@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.6.1
+// @version      0.6.2
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set
@@ -105,7 +105,7 @@
                         if (remainingDropsLive.length > 0) {
                             location.assign(remainingDropsLive[0].url);
                         } else {
-                            console.log(`[Auto Rust Drops] %cNobody Online :( %cRemaining: %c${remainingDrops.map((drop) => drop.name).join(", ")}`, "color: red; font-weight: bold;", "color: none", "color: purple; font-weight: bold;");
+                            console.log(`[Auto Rust Drops] %cNobody Online :( %cRemaining: %c\n${remainingDrops.map((drop) => drop.name).join("\n")}`, "color: red; font-weight: bold;", "color: none", "color: purple; font-weight: bold;");
                         }
                     } else if (remainingDrops.length == 0) {
                         GM_notification("All Rust Drops Claimed!", "All Rust Twitch Prime Drops have been claimed!", "https://twitch.facepunch.com/favicon.png");
