@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.6.5
+// @version      0.6.6
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Non-Channel-Specific Drops wont get shown as uncompleted, but by the time the others are done they are too)
@@ -107,6 +107,8 @@
                             location.assign(remainingDropsLive[0].url);
                         } else {
                             console.log(`[Auto Rust Drops] %cNobody Online :( %cRemaining: %c\n${remainingDrops.map((drop) => drop.name).join("\n")}`, "color: red; font-weight: bold;", "color: none", "color: purple; font-weight: bold;");
+                            const firstLive = fpDrops.find((fp) => fp.live);
+                            if (firstLive && location.href != firstLive.url) location.assign(firstLive.url);
                         }
                     } else if (remainingDrops.length == 0) {
                         GM_notification("All Rust Drops Claimed!", "All Rust Twitch Prime Drops have been claimed!", "https://twitch.facepunch.com/favicon.png");
