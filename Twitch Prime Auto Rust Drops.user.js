@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.6.3
+// @version      0.6.4
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Non-Channel-Specific Drops wont get shown as uncompleted, but by the time the others are done they are too)
@@ -115,7 +115,8 @@
             });
 
             openQueryTabs();
-            setInterval(openQueryTabs, 5 * 60000); // Every 5 Min
+            setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
+            setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
         }
     });
 })();
