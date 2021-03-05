@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.6.6
+// @version      0.6.7
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Non-Channel-Specific Drops wont get shown as uncompleted, but by the time the others are done they are too)
@@ -19,6 +19,9 @@
 
 (async () => {
     "use strict";
+
+    var queryInterval;
+    var reloadTimeout;
 
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,14 +114,16 @@
                             if (firstLive && location.href != firstLive.url) location.assign(firstLive.url);
                         }
                     } else if (remainingDrops.length == 0) {
+                        clearInterval(queryInterval);
+                        clearTimeout(reloadTimeout);
                         GM_notification("All Rust Drops Claimed!", "All Rust Twitch Prime Drops have been claimed!", "https://twitch.facepunch.com/favicon.png");
                     }
                 }
             });
 
             openQueryTabs();
-            setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
-            setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
+            queryInterval = setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
+            reloadTimeout = setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
         }
     });
 })();
