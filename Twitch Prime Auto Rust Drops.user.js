@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.5
+// @version      0.6
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set
 // @author       Erik
@@ -60,9 +60,13 @@
                 });
             }
         } else if (location.href == "https://www.twitch.tv/drops/inventory?checkonly") {
-            await sleep(5000);
+            do {
+                console.log($(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`).length);
+                await sleep(100);
+            } while ($(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`).length == 0);
+
             $(`[data-test-selector="DropsCampaignInProgressRewardPresentation-claim-button"]`).trigger("click");
-            await sleep(5000);
+            await sleep(4000);
             const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`)
                 .toArray()
                 .filter((e) => {
@@ -87,13 +91,16 @@
                 if (msg.type == "TWITCH") twDrops = msg.drops;
                 if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
                 if (fpDrops.length > 0 && twDrops.length > 0) {
-                    remainingDrops = fpDrops.filter((fp) => !twDrops.some((tw) => tw.toLowerCase().replace(/[-_\s]/, "") == fp.name.toLowerCase().replace(/[-_\s]/, "")));
+                    function rpl(s) {
+                        return s.toLowerCase().replace(/[-_\s]/, "");
+                    }
+                    remainingDrops = fpDrops.filter((fp) => !twDrops.some((tw) => rpl(tw) == rpl(fp.name) || rpl(tw).startsWith(new URL(fp.url).pathname.substring(1))));
                     remainingDropsLive = remainingDrops.filter((drop) => drop.live);
 
                     const currentDrop = remainingDropsLive.find((drop) => drop.url == location.href);
                     if (currentDrop) {
                         console.log(`[Auto Rust Drops] %c${currentDrop.name} %cStill not claimed`, "color: purple; font-weight: bold;", "color: none");
-                    } else if (remainingDropsLive.length > 0) {
+                    } else if (remainingDrops.length > 0) {
                         if (remainingDropsLive.length > 0) {
                             location.assign(remainingDropsLive[0].url);
                         } else {
