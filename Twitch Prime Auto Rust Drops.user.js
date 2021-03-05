@@ -2,7 +2,7 @@
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
 // @version      0.5
-// @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.js
+// @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set
 // @author       Erik
 // @match        https://www.twitch.tv/drops/inventory?checkonly
@@ -104,6 +104,7 @@
                     }
                 }
             });
+
             openQueryTabs();
             setInterval(openQueryTabs, 5 * 60000); // Every 5 Min
         }
