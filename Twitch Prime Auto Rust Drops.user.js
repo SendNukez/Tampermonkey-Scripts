@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.6.2
+// @version      0.6.3
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
-// @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set
+// @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Non-Channel-Specific Drops wont get shown as uncompleted, but by the time the others are done they are too)
 // @author       Erik
 // @match        https://www.twitch.tv/drops/inventory?checkonly
 // @match        https://twitch.facepunch.com/*
@@ -91,7 +91,8 @@
                 console.log("[Auto Rust Drops] MSG:", msg);
                 if (msg.type == "TWITCH") twDrops = msg.drops;
                 if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
-                if (fpDrops.length > 0 && twDrops.length > 0) {
+
+                if (msg.type == "TWITCH" && fpDrops.length > 0) {
                     function rpl(s) {
                         return s.toLowerCase().replace(/[-_\s]/, "");
                     }
