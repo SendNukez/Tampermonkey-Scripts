@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      0.6.4
+// @version      0.6.5
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Non-Channel-Specific Drops wont get shown as uncompleted, but by the time the others are done they are too)
 // @author       Erik
 // @match        https://www.twitch.tv/drops/inventory?checkonly
 // @match        https://twitch.facepunch.com/*
-// @match        https://www.twitch.tv/*?drops
+// @match        https://www.twitch.tv/*?rustdrops
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @grant        GM_openInTab
 // @grant        GM_setValue
@@ -47,7 +47,7 @@
                 const drops = $("section.streamer-drops a")
                     .toArray()
                     .map((elem) => {
-                        return { name: $(elem).find(".drop-footer > .drop-name").text(), url: $(elem).attr("href") + "?drops", live: $(elem).hasClass("is-live") };
+                        return { name: $(elem).find(".drop-footer > .drop-name").text(), url: $(elem).attr("href") + "?rustdrops", live: $(elem).hasClass("is-live") };
                     });
                 setTimeout(() => {
                     sendMessage("drops", { type: "FACEPUNCH", drops });
@@ -56,7 +56,7 @@
             } else {
                 $("section.streamer-drops a").map((i, elem) => {
                     const old = elem.getAttribute("href");
-                    elem.setAttribute("href", old + "?drops");
+                    elem.setAttribute("href", old + "?rustdrops");
                     return elem;
                 });
             }
