@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      1.0.0
+// @version      1.0.1
 // @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set.
@@ -67,9 +67,9 @@
         GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
     }
 
-    function sendNotification(title, message, iconUrl = "https://twitch.facepunch.com/favicon.png") {
-        if (GM_config.get("notifications")) GM_notification(title, message, iconUrl);
-        console.log(title, message, iconUrl);
+    function sendNotification(title, message, iconUrl, desktopNotification = true) {
+        iconUrl = iconUrl ?? "https://twitch.facepunch.com/favicon.png";
+        if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl);
         iziToast.show({
             title,
             message,
@@ -140,10 +140,7 @@
                 console.log("[Auto Rust Drops] MSG:", msg);
                 if (msg.type == "TWITCH") twDrops = msg.drops;
                 if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
-                if (msg.type == "CLAIMED") {
-                    console.log(`[Auto Rust Drops] %c${msg.name} %chas been Claimed!`, "color: #9147ff; font-weight: bold;", "color: none");
-                    sendNotification("Rust Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
-                }
+                if (msg.type == "CLAIMED") sendNotification("Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
 
                 if (msg.type == "TWITCH" && fpDrops.length > 0) {
                     function rpl(s) {
@@ -155,22 +152,26 @@
                     remainingDrops = fpDrops.filter((fp) => !twDrops.some((tw) => rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname))));
                     remainingDropsLive = remainingDrops.filter((drop) => drop.live);
 
+                    const key = fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
                     const currentDrop = remainingDropsLive.find((drop) => drop.url == location.href);
-                    if (currentDrop) {
-                        console.log(`[Auto Rust Drops] Still waiting for %c${currentDrop.name}%c...`, "color: #9147ff; font-weight: bold;", "color: none");
-                    } else if (remainingDrops.length > 0) {
+                    if (!currentDrop && remainingDrops.length > 0) {
                         if (remainingDropsLive.length > 0) {
                             location.assign(remainingDropsLive[0].url);
                         } else {
-                            console.log(`[Auto Rust Drops] %cNobody Online :( %cRemaining: %c\n${remainingDrops.map((drop) => drop.name).join("\n")}`, "color: red; font-weight: bold;", "color: none", "color: #9147ff; font-weight: bold;");
+                            sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${remainingDrops.length} Drops remaining`, null, false);
                             const firstLive = fpDrops.find((fp) => fp.live);
                             if (firstLive && location.href != firstLive.url) location.assign(firstLive.url);
                         }
-                    } else if (remainingDrops.length == 0) {
+                    } else if (!currentDrop && remainingDrops.length == 0) {
+                        if (GM_getValue("claimed", []).includes(key)) {
+                            sendNotification("All Drops Claimed!", "Drops have already been claimed!", null, false);
+                        } else {
+                            sendNotification("All Drops Claimed!", "All Drops have been claimed!");
+                            GM_setValue("claimed", [...GM_getValue("claimed", []), key]);
+                        }
+
                         clearInterval(window.queryInterval);
                         clearTimeout(window.reloadTimeout);
-                        console.log(`[Auto Rust Drops] %cAll Drops %chave been Claimed!`, "color: #9147ff; font-weight: bold;", "color: none");
-                        sendNotification("All Rust Drops Claimed!", "All Rust Twitch Prime Drops have been claimed!");
                     }
                 }
             });
