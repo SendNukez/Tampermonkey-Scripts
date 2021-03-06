@@ -2,7 +2,6 @@
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
 // @version      1.0.1
-// @updateURL    https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set.
 // @author       Erik
