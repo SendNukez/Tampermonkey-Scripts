@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      1.0.3
+// @version      1.0.4
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set.
 // @author       Erik
@@ -55,7 +55,7 @@
     }
 
     function onMessage(label, callback) {
-        window.listenerID = GM_addValueChangeListener(label, (name, old_value, new_value, remote) => {
+        GM_addValueChangeListener(label, (name, old_value, new_value, remote) => {
             if (new_value != "MSG_CLEAR") callback(new_value);
         });
         sendMessage(label, "MSG_CLEAR");
