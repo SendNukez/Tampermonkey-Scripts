@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      1.0.4
+// @version      1.0.5
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
-// @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set.
+// @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
 // @match        https://www.twitch.tv/drops/inventory?checkonly
 // @match        https://twitch.facepunch.com/*
@@ -85,6 +85,7 @@
             iconUrl: "https://twitch.facepunch.com/favicon.png",
             color: "#9147ff",
             theme: "dark",
+            layout: 2,
             position: "topCenter",
             timeout: 10000,
             transitionIn: "bounceInDown",
@@ -149,7 +150,7 @@
             sendMessage("drops", { type: "TWITCH", drops });
             window.close();
         } else if (location.host == "www.twitch.tv" && params.has("rustdrops")) {
-            let firstQuery = true;
+            let alreadyQueried = {};
             let fpDrops = [];
             let twDrops = [];
             let remainingDrops = [];
@@ -168,6 +169,8 @@
                 }
 
                 if (msg.type == "TWITCH" && fpDrops.length > 0) {
+                    if (!alreadyQueried.TWITCH) sendNotification("Watching for Drops", "Auto claiming/switching for Drops", null, false);
+
                     function rpl(s) {
                         return s.toLowerCase().replace(/[\/-_\s0-9]/g, "");
                     }
@@ -199,7 +202,7 @@
                     }
                 }
 
-                firstQuery = false;
+                alreadyQueried[msg.type] = true;
             });
 
             openQueryTabs();
