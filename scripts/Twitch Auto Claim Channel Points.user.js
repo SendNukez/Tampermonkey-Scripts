@@ -1,40 +1,31 @@
 // ==UserScript==
 // @name         Twitch Auto Claim Channel Points
 // @homepage     https://www.twitch.tv/
-// @version      1.0
+// @version      1.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Auto%20Claim%20Channel%20Points.user.js
 // @description  Automatically claims Twitch Channel Points
 // @author       Erik
 // @match        https://www.twitch.tv/*
+// @noframes
+// @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @grant        none
 // ==/UserScript==
 
-(function () {
+(async () => {
     "use strict";
 
-    window.lastPointsClaimed = 0;
+    let observer = new MutationObserver(() => {
+        const bonus = $(".claimable-bonus__icon");
+        if (bonus.length != 0) {
+            bonus.trigger("click");
+            console.log("[Auto Claimer] Claimed");
+        }
+    });
 
-    let MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
-    if (MutationObserver) {
-        let observer = new MutationObserver((e) => {
-            if (Date.now() - window.lastPointsClaimed < 20000) {
-                return;
-            }
+    do {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Sleep
+    } while ($(".chat-input").length == 0);
 
-            let bonus = document.querySelector(".claimable-bonus__icon");
-            if (bonus) {
-                window.lastPointsClaimed = Date.now();
-                setTimeout(() => {
-                    bonus.click();
-                    console.log("[Auto Claimer] Claimed");
-                }, 1000);
-            }
-        });
-        setTimeout(() => {
-            console.log("[Auto claimer] Observing for Changes...");
-            observer.observe(document.body, { childList: true, subtree: true });
-        }, 10000);
-    } else {
-        console.log("[Auto claimer] Unsupported Browser");
-    }
+    observer.observe($(".chat-input").get(0), { childList: true, subtree: true });
+    console.log("[Auto claimer] Observing for Changes...");
 })();
