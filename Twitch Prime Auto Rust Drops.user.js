@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      1.0.1
+// @version      1.0.2
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set.
 // @author       Erik
@@ -10,7 +10,7 @@
 // @match        https://www.twitch.tv/*?rustdrops
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
-// @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min.js
 // @resource     iziToast https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.min.css
 // @grant        GM_openInTab
@@ -107,7 +107,7 @@
                 tries++;
                 await sleep(100);
             } while ($(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`).length == 0);
-            await sleep(200);
+            await sleep(100);
 
             let claimed = false;
             $(`[data-test-selector="DropsCampaignInProgressRewardPresentation-claim-button"]`).each(function () {
@@ -119,14 +119,21 @@
 
             if (claimed) await sleep(4000);
 
+            const lang = $(document.documentElement).attr("lang");
             const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`)
                 .toArray()
                 .filter((e) => {
                     const agoArr = $(e).find(".tw-c-text-alt-2").first().text().split(" ");
-                    const twoWeeksAgo = agoArr[0] == "yesterday" || (agoArr.length == 3 && Math.abs(moment().subtract(agoArr[0], agoArr[1]).diff(moment(), "day")) <= 8);
-                    return $(e).find(`[data-test-selector="awarded-drop__game-name"]`).text() == "Rust" && twoWeeksAgo;
+                    let daysAgo = 0;
+                    if (lang.startsWith("en-")) {
+                        if (agoArr[0] == "yesterday") daysAgo = 1; // yesterday
+                        if (agoArr.length == 2) daysAgo = Math.abs(moment().subtract(1, agoArr[1]).diff(moment(), "day")); // last year
+                        if (agoArr.length == 3) daysAgo = Math.abs(moment().subtract(agoArr[0], agoArr[1]).diff(moment(), "day")); // 2 days ago
+                    }
+                    return $(e).find(`[data-test-selector="awarded-drop__game-name"]`).text() == "Rust" && daysAgo <= 8;
                 })
                 .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text());
+            console.log(drops);
 
             sendMessage("drops", { type: "TWITCH", drops });
             window.close();
