@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @namespace    https://twitch.facepunch.com/
-// @version      1.0.2
+// @version      1.0.3
 // @downloadURL  https://raw.githubusercontent.com/ErikS270102/Tampermonkey-Scripts/master/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set.
 // @author       Erik
 // @match        https://www.twitch.tv/drops/inventory?checkonly
 // @match        https://twitch.facepunch.com/*
-// @match        https://www.twitch.tv/*?rustdrops
+// @match        https://www.twitch.tv/*
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js
@@ -28,6 +28,10 @@
 
     GM_addStyle(GM_getResourceText("iziToast"));
 
+    GM_registerMenuCommand("Open Drops Page", () => {
+        GM_openInTab("https://twitch.facepunch.com/", { active: true, insert: true });
+    });
+
     GM_config.init({
         id: "Config",
         fields: {
@@ -44,13 +48,14 @@
 
     window.queryInterval = null;
     window.reloadTimeout = null;
+    window.stopped = false;
 
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     function onMessage(label, callback) {
-        GM_addValueChangeListener(label, (name, old_value, new_value, remote) => {
+        window.listenerID = GM_addValueChangeListener(label, (name, old_value, new_value, remote) => {
             if (new_value != "MSG_CLEAR") callback(new_value);
         });
         sendMessage(label, "MSG_CLEAR");
@@ -66,13 +71,18 @@
         GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
     }
 
+    function stop() {
+        window.stopped = true;
+        clearInterval(window.queryInterval);
+        clearTimeout(window.reloadTimeout);
+    }
+
     function sendNotification(title, message, iconUrl, desktopNotification = true) {
-        iconUrl = iconUrl ?? "https://twitch.facepunch.com/favicon.png";
-        if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl);
+        if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl ?? "https://twitch.facepunch.com/favicon.png");
         iziToast.show({
             title,
             message,
-            iconUrl,
+            iconUrl: "https://twitch.facepunch.com/favicon.png",
             color: "#9147ff",
             theme: "dark",
             position: "topCenter",
@@ -83,8 +93,9 @@
     }
 
     $(async () => {
+        const params = new URL(location.href).searchParams;
         if (location.host == "twitch.facepunch.com") {
-            if (location.search == "?checkonly") {
+            if (params.has("checkonly")) {
                 const drops = $("section.streamer-drops a, section.general-drops a")
                     .toArray()
                     .map((elem) => {
@@ -137,16 +148,24 @@
 
             sendMessage("drops", { type: "TWITCH", drops });
             window.close();
-        } else if (location.host == "www.twitch.tv") {
+        } else if (location.host == "www.twitch.tv" && params.has("rustdrops")) {
+            let firstQuery = true;
             let fpDrops = [];
             let twDrops = [];
             let remainingDrops = [];
             let remainingDropsLive = [];
+
             onMessage("drops", (msg) => {
+                if (window.stopped) return;
                 console.log("[Auto Rust Drops] MSG:", msg);
-                if (msg.type == "TWITCH") twDrops = msg.drops;
-                if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
                 if (msg.type == "CLAIMED") sendNotification("Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
+                if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
+                if (msg.type == "TWITCH") twDrops = msg.drops;
+
+                if (msg.type == "FACEPUNCH" && fpDrops.length == 0) {
+                    sendNotification("No Drops Available", "Didn't find any Drops", null, false);
+                    stop();
+                }
 
                 if (msg.type == "TWITCH" && fpDrops.length > 0) {
                     function rpl(s) {
@@ -176,10 +195,11 @@
                             GM_setValue("claimed", [...GM_getValue("claimed", []), key]);
                         }
 
-                        clearInterval(window.queryInterval);
-                        clearTimeout(window.reloadTimeout);
+                        stop();
                     }
                 }
+
+                firstQuery = false;
             });
 
             openQueryTabs();
