@@ -5,9 +5,8 @@
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
-// @match        https://www.twitch.tv/drops/inventory?checkonly
+// @match        https://www.twitch.tv/**
 // @match        https://twitch.facepunch.com/*
-// @match        https://www.twitch.tv/*
 // @noframes
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
@@ -150,7 +149,7 @@
 
             sendMessage("drops", { type: "TWITCH", drops });
             window.close();
-        } else if (location.host == "www.twitch.tv" && params.has("rustdrops")) {
+        } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9]+$/i.test(location.pathname) && params.has("rustdrops")) {
             let alreadyQueried = {};
             let fpDrops = [];
             let twDrops = [];
