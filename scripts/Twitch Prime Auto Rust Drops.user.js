@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      1.0.5
+// @version      1.1.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -97,12 +97,14 @@
         const params = new URL(location.href).searchParams;
         if (location.host == "twitch.facepunch.com") {
             if (params.has("checkonly")) {
-                const drops = $("section.streamer-drops a, section.general-drops a")
+                const drops = $(".drop-name")
                     .toArray()
-                    .map((elem) => {
-                        return { name: $(elem).find(".drop-footer > .drop-name").text(), url: $(elem).attr("href") + "?rustdrops", live: $(elem).hasClass("is-live") };
+                    .map((name) => {
+                        const parent = $(name).closest(".drop");
+                        return { name: $(name).text(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
                     });
 
+                console.log(drops);
                 sendMessage("drops", { type: "FACEPUNCH", drops });
                 window.close();
             } else {
@@ -145,8 +147,8 @@
                     return $(e).find(`[data-test-selector="awarded-drop__game-name"]`).text() == "Rust" && daysAgo <= 8;
                 })
                 .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text());
-            console.log(drops);
 
+            console.log(drops);
             sendMessage("drops", { type: "TWITCH", drops });
             window.close();
         } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9]+$/i.test(location.pathname) && params.has("rustdrops")) {
@@ -178,17 +180,15 @@
                         return rpl(s.split(" ")[0]);
                     }
                     remainingDrops = fpDrops.filter((fp) => !twDrops.some((tw) => rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname))));
-                    remainingDropsLive = remainingDrops.filter((drop) => drop.live);
+                    remainingDropsLive = remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
 
                     const key = fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
-                    const currentDrop = remainingDropsLive.find((drop) => drop.url == location.href);
+                    const currentDrop = remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
                     if (!currentDrop && remainingDrops.length > 0) {
                         if (remainingDropsLive.length > 0) {
                             location.assign(remainingDropsLive[0].url);
                         } else {
                             sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${remainingDrops.length} Drops remaining`, null, false);
-                            const firstLive = fpDrops.find((fp) => fp.live);
-                            if (firstLive && location.href != firstLive.url) location.assign(firstLive.url);
                         }
                     } else if (!currentDrop && remainingDrops.length == 0) {
                         if (GM_getValue("claimed", []).includes(key)) {
