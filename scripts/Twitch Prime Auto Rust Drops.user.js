@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      1.2.2
+// @version      1.2.3
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -55,6 +55,10 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
     window.queryInterval = null;
     window.reloadTimeout = null;
     window.stopped = false;
+
+    function log(...data) {
+        console.log("%cAuto Rust Drops:", "color: #1e2020; background-color: #cd412b; padding: 2px 5px; border-radius: 2px; font-weight: bold;", ...data);
+    }
 
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -199,7 +203,7 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                         return { name: $(name).text(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
                     });
 
-                console.log(drops);
+                log(drops);
                 sendMessage("drops", { type: "FACEPUNCH", drops });
                 window.close();
             }
@@ -243,7 +247,7 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                 })
                 .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text());
 
-            console.log(drops);
+            log(drops);
             sendMessage("drops", { type: "TWITCH", drops, percentages });
             window.close();
         } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9]+$/i.test(location.pathname) && params.has("rustdrops")) {
@@ -255,7 +259,7 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
 
             onMessage("drops", (msg) => {
                 if (window.stopped) return;
-                console.log("[Auto Rust Drops] MSG:", msg);
+                log("MSG:", msg);
                 if (msg.type == "CLAIMED") sendNotification("Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
                 if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
                 if (msg.type == "TWITCH") twDrops = msg.drops;
