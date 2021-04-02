@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      1.2.0
+// @version      1.2.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -157,9 +157,9 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
             $(".top-nav__search-container").append(`
                 <div class="rustdrops-popup">
                     <div class="inner">
-                        <p class="small muted">${window.currentDrop.name}</p>
+                        <p class="small muted">NAME</p>
                         <div class="rustdrops-popup-progress-container">
-                            <div class="rustdrops-popup-progress-text">0%</div>
+                            <div class="rustdrops-popup-progress-text">PRECENTAGE</div>
                             <div class="rustdrops-popup-progress-outer"><div class="rustdrops-popup-progress-inner" style="width: 0%;"></div></div>
                         </div>
                     </div>
@@ -169,10 +169,15 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
             window.hasPopup = true;
         }
 
-        if (!window.popupShown) {
-            console.log(window.currentDrop);
+        console.log(window.currentDrop);
+
+        if (window.currentDrop) {
+            $(".rustdrops-popup > .inner > p").text(window.currentDrop.name);
             $(".rustdrops-popup-progress-text").text(`${window.currentDrop.percentage}%`);
             $(".rustdrops-popup-progress-inner").attr("style", `width: ${window.currentDrop.percentage}%;`);
+        }
+
+        if (!window.popupShown) {
             if (toggle) window.popupShown = true;
         } else {
             if (toggle) window.popupShown = false;
@@ -182,6 +187,12 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
     $(async () => {
         const params = new URL(location.href).searchParams;
         if (location.host == "twitch.facepunch.com") {
+            $("section.streamer-drops a, section.general-drops a").map((i, elem) => {
+                const old = elem.getAttribute("href");
+                if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
+                return elem;
+            });
+
             if (params.has("checkonly")) {
                 const drops = $(".drop-name")
                     .toArray()
@@ -193,12 +204,6 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                 console.log(drops);
                 sendMessage("drops", { type: "FACEPUNCH", drops });
                 window.close();
-            } else {
-                $("section.streamer-drops a, section.general-drops a").map((i, elem) => {
-                    const old = elem.getAttribute("href");
-                    if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
-                    return elem;
-                });
             }
         } else if (location.href == "https://www.twitch.tv/drops/inventory?checkonly") {
             let tries = 0;
@@ -266,11 +271,12 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                     if (!alreadyQueried.TWITCH) sendNotification("Watching for Drops", "Auto claiming/switching for Drops", null, false);
 
                     function rpl(s) {
-                        return s.toLowerCase().replace(/[\/-_\s0-9]/g, "");
+                        return s.toLowerCase().replace(/[^a-z]/g, "");
                     }
                     function rpl1st(s) {
                         return rpl(s.split(" ")[0]);
                     }
+
                     remainingDrops = fpDrops.filter((fp) => !twDrops.some((tw) => rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname))));
                     remainingDropsLive = remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
 
@@ -279,6 +285,8 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                     if (window.currentDrop) window.currentDrop = { ...window.currentDrop, percentage: msg.percentages.find((obj) => obj.name == window.currentDrop.name).percentage };
 
                     updatePopup();
+
+                    console.log(remainingDrops, remainingDropsLive, window.currentDrop);
 
                     if (!window.currentDrop && remainingDrops.length > 0) {
                         if (remainingDropsLive.length > 0) {
