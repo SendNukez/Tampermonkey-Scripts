@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      1.1.0
+// @version      1.2.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -22,6 +22,9 @@
 // @grant        GM_getResourceText
 // @grant        GM_addStyle
 // ==/UserScript==
+
+const SVG_TOGGLE_DOWN = `<svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg>`;
+const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M5.5 13.5L10 9l4.5 4.5L16 12l-6-6-6 6 1.5 1.5z"></path></g></svg>`;
 
 (async () => {
     "use strict";
@@ -46,6 +49,9 @@
         GM_config.open();
     });
 
+    window.hasPopup = false;
+    window.popupShown = false;
+    window.currentDrop = null;
     window.queryInterval = null;
     window.reloadTimeout = null;
     window.stopped = false;
@@ -79,18 +85,98 @@
 
     function sendNotification(title, message, iconUrl, desktopNotification = true) {
         if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl ?? "https://twitch.facepunch.com/favicon.png");
-        iziToast.show({
-            title,
-            message,
-            iconUrl: "https://twitch.facepunch.com/favicon.png",
-            color: "#9147ff",
-            theme: "dark",
-            layout: 2,
-            position: "topCenter",
-            timeout: 10000,
-            transitionIn: "bounceInDown",
-            transitionOut: "fadeOutUp"
-        });
+        // iziToast.show({
+        //     title,
+        //     message,
+        //     iconUrl: "https://twitch.facepunch.com/favicon.png",
+        //     color: "#9147ff",
+        //     theme: "dark",
+        //     layout: 2,
+        //     position: "topCenter",
+        //     timeout: 10000,
+        //     transitionIn: "bounceInDown",
+        //     transitionOut: "fadeOutUp"
+        // });
+    }
+
+    function updatePopup(toggle = false) {
+        if (!window.hasPopup) {
+            GM_addStyle(`
+                .rustdrops-popup {
+                    position: absolute;
+                    display: flex;
+                    top: 6rem;
+                    padding: 0.5rem;
+                    width: 100%;
+                    background-color: var(--color-background-base);
+                    border-radius: var(--border-radius-large);
+                    border: var(--border-width-default) solid var(--color-border-base);
+                    box-shadow: var(--shadow-elevation-2);
+                    color: var(--color-text-base);
+                }
+
+                .rustdrops-popup > .inner {
+                    padding: 1rem;
+                    width: 100%;
+                }
+
+                .rustdrops-popup .muted {
+                    color: var(--color-text-alt-2) !important;
+                }
+
+                .rustdrops-popup p {
+                    font-size: var(--font-size-5) !important;
+                }
+
+                .rustdrops-popup p.small {
+                    font-size: var(--font-size-8) !important;
+                }
+
+                .rustdrops-popup-progress-container {
+                    width: 100%;
+                    display: grid;
+                    grid-template-columns: auto 1fr;
+                    gap: 0px 1rem;
+                }
+
+                .rustdrops-popup-progress-outer {
+                    height: 0.5rem;
+                    width: 100%;
+                    margin: auto;
+                    border-radius: var(--border-radius-large)!important;
+                    background: var(--color-background-progress);
+                    overflow: hidden;
+                }
+
+                .rustdrops-popup-progress-inner {
+                    height: 100%;
+                    background: var(--color-background-progress-status);
+                }
+            `);
+
+            $(".top-nav__search-container").append(`
+                <div class="rustdrops-popup">
+                    <div class="inner">
+                        <p class="small muted">${window.currentDrop.name}</p>
+                        <div class="rustdrops-popup-progress-container">
+                            <div class="rustdrops-popup-progress-text">0%</div>
+                            <div class="rustdrops-popup-progress-outer"><div class="rustdrops-popup-progress-inner" style="width: 0%;"></div></div>
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            window.hasPopup = true;
+        }
+
+        if (!window.popupShown) {
+            console.log(window.currentDrop);
+            $(".rustdrops-popup-progress-text").text(`${window.currentDrop.percentage}%`);
+            $(".rustdrops-popup-progress-inner").attr("style", `width: ${window.currentDrop.percentage}%;`);
+            if (toggle) window.popupShown = true;
+        } else {
+            if (toggle) window.popupShown = false;
+        }
     }
 
     $(async () => {
@@ -134,6 +220,12 @@
             if (claimed) await sleep(4000);
 
             const lang = $(document.documentElement).attr("lang");
+            const percentages = $(`[data-test-selector="DropsCampaignInProgressRewards-container"] > * > .tw-flex`)
+                .toArray()
+                .filter((e) => $(e).has(".tw-hidden").length == 0)
+                .map((e) => {
+                    return { name: $(e).find(".tw-flex p").text(), percentage: Number($(e).find(`[role="progressbar"]`).attr("aria-valuenow")) };
+                });
             const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`)
                 .toArray()
                 .filter((e) => {
@@ -149,7 +241,7 @@
                 .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text());
 
             console.log(drops);
-            sendMessage("drops", { type: "TWITCH", drops });
+            sendMessage("drops", { type: "TWITCH", drops, percentages });
             window.close();
         } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9]+$/i.test(location.pathname) && params.has("rustdrops")) {
             let alreadyQueried = {};
@@ -183,14 +275,18 @@
                     remainingDropsLive = remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
 
                     const key = fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
-                    const currentDrop = remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
-                    if (!currentDrop && remainingDrops.length > 0) {
+                    window.currentDrop = remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
+                    if (window.currentDrop) window.currentDrop = { ...window.currentDrop, percentage: msg.percentages.find((obj) => obj.name == window.currentDrop.name).percentage };
+
+                    updatePopup();
+
+                    if (!window.currentDrop && remainingDrops.length > 0) {
                         if (remainingDropsLive.length > 0) {
                             location.assign(remainingDropsLive[0].url);
                         } else {
                             sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${remainingDrops.length} Drops remaining`, null, false);
                         }
-                    } else if (!currentDrop && remainingDrops.length == 0) {
+                    } else if (!window.currentDrop && remainingDrops.length == 0) {
                         if (GM_getValue("claimed", []).includes(key)) {
                             sendNotification("All Drops Claimed!", "Drops have already been claimed!", null, false);
                         } else {
