@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      1.2.4
+// @version      1.3.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -12,6 +12,7 @@
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min.js
+// @require      https://kit.fontawesome.com/acc839bd0c.js
 // @resource     iziToast https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.min.css
 // @grant        GM_openInTab
 // @grant        GM_setValue
@@ -52,6 +53,9 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
     window.hasPopup = false;
     window.popupShown = false;
     window.currentDrop = null;
+    window.fpDrops = [];
+    window.remainingDrops = [];
+    window.remainingDropsLive = [];
     window.queryInterval = null;
     window.reloadTimeout = null;
     window.stopped = false;
@@ -62,6 +66,17 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
 
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function rpl(s) {
+        return s.toLowerCase().replace(/[^a-z]/g, "");
+    }
+    function rpl1st(s) {
+        return rpl(s.split(" ")[0]);
+    }
+
+    function isSameFpTw(fp, tw) {
+        return rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname));
     }
 
     function onMessage(label, callback) {
@@ -110,8 +125,9 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                     position: absolute;
                     display: flex;
                     top: 6rem;
+                    left: -50px;
                     padding: 0.5rem;
-                    width: 100%;
+                    width: calc(100% + 100px);
                     background-color: var(--color-background-base);
                     border-radius: var(--border-radius-large);
                     border: var(--border-width-default) solid var(--color-border-base);
@@ -128,12 +144,12 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                     color: var(--color-text-alt-2) !important;
                 }
 
-                .rustdrops-popup p {
-                    font-size: var(--font-size-5) !important;
+                .rustdrops-popup .small {
+                    font-size: var(--font-size-8) !important;
                 }
 
-                .rustdrops-popup p.small {
-                    font-size: var(--font-size-8) !important;
+                .rustdrops-popup p {
+                    font-size: var(--font-size-5) !important;
                 }
 
                 .rustdrops-popup-progress-container {
@@ -154,18 +170,44 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
 
                 .rustdrops-popup-progress-inner {
                     height: 100%;
+                    width: 0%;
                     background: var(--color-background-progress-status);
+                    transition: width ease-in-out 1s;
+                }
+
+                .rustdrops-popup .rustdrops-popup-list {
+                    width: 100%;
+                    display: grid;
+                    margin: 0px 10px;
+                    margin-top: 5px;
+                    grid-template-columns: repeat(2, 1fr);
+                    grid-auto-rows: auto;
+                }
+
+                .rustdrops-popup .rustdrops-popup-list .live,
+                .rustdrops-popup .rustdrops-popup-list i {
+                    margin-left: 5px;
+                }
+
+                .rustdrops-popup .rustdrops-popup-list .live {
+                    font-size: 10px;
+                    color: white;
+                    background-color: red;
+                    font-weight: bold;
+                    padding: 2px 4px;
+                    border-radius: 3px;
                 }
             `);
 
             $(".top-nav__search-container").append(`
                 <div class="rustdrops-popup">
                     <div class="inner">
-                        <p class="small muted">NAME</p>
+                        <p>NAME</p>
                         <div class="rustdrops-popup-progress-container">
-                            <div class="rustdrops-popup-progress-text">PRECENTAGE</div>
+                            <div class="rustdrops-popup-progress-text muted">PRECENTAGE</div>
                             <div class="rustdrops-popup-progress-outer"><div class="rustdrops-popup-progress-inner" style="width: 0%;"></div></div>
                         </div>
+                        <div class="rustdrops-popup-list"></div>
                     </div>
                 </div>
             `);
@@ -175,8 +217,23 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
 
         if (window.currentDrop) {
             $(".rustdrops-popup > .inner > p").text(window.currentDrop.name);
-            $(".rustdrops-popup-progress-text").text(`${window.currentDrop.percentage}%`);
-            $(".rustdrops-popup-progress-inner").attr("style", `width: ${window.currentDrop.percentage}%;`);
+            $(".rustdrops-popup-progress-text").text(`${window.currentDrop.progress}%`);
+            $(".rustdrops-popup-progress-inner").attr("style", `width: ${window.currentDrop.progress}%;`);
+        }
+        if (window.fpDrops.length > 0) {
+            $(".rustdrops-popup .rustdrops-popup-list").html(
+                window.fpDrops
+                    .map((drop) => {
+                        const thisDrop = window.remainingDrops.find((e) => e.name == drop.name);
+                        const claimed = !thisDrop;
+                        const hasProgress = thisDrop && thisDrop.progress > 0;
+                        const live = drop.isLive;
+                        if (drop.url == location.href) return "";
+                        if (claimed) return `<div class="small muted">${drop.name}<i class="fas fa-check-circle" style="color: #00c7ac;"></i></div>`;
+                        return `<div class="small">${drop.name}${live ? `<span class="live">LIVE</span>` : ""}${hasProgress ? `<i class="fas fa-adjust" style="color: #ffbb00;"></i>` : ""}</div>`;
+                    })
+                    .join("")
+            );
         }
 
         if (!window.popupShown) {
@@ -189,11 +246,13 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
     $(async () => {
         const params = new URL(location.href).searchParams;
         if (location.host == "twitch.facepunch.com") {
-            $("section.streamer-drops a, section.general-drops a").map((i, elem) => {
-                const old = elem.getAttribute("href");
-                if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
-                return elem;
-            });
+            $("section.streamer-drops a, section.general-drops a")
+                .removeAttr("target")
+                .map((i, elem) => {
+                    const old = elem.getAttribute("href");
+                    if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
+                    return elem;
+                });
 
             if (params.has("checkonly")) {
                 const drops = $(".drop-name")
@@ -252,49 +311,41 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
             window.close();
         } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9]+$/i.test(location.pathname) && params.has("rustdrops")) {
             let alreadyQueried = {};
-            let fpDrops = [];
-            let twDrops = [];
-            let remainingDrops = [];
-            let remainingDropsLive = [];
 
             onMessage("drops", (msg) => {
                 if (window.stopped) return;
                 log("MSG:", msg);
                 if (msg.type == "CLAIMED") sendNotification("Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
-                if (msg.type == "FACEPUNCH") fpDrops = msg.drops;
-                if (msg.type == "TWITCH") twDrops = msg.drops;
+                if (msg.type == "FACEPUNCH") window.fpDrops = msg.drops;
+                if (msg.type == "TWITCH") window.twDrops = msg.drops;
 
-                if (msg.type == "FACEPUNCH" && fpDrops.length == 0) {
+                if (msg.type == "FACEPUNCH" && window.fpDrops.length == 0) {
                     sendNotification("No Drops Available", "Didn't find any Drops", null, false);
                     stop();
                 }
 
-                if (msg.type == "TWITCH" && fpDrops.length > 0) {
+                if (msg.type == "TWITCH" && window.fpDrops.length > 0) {
                     if (!alreadyQueried.TWITCH) sendNotification("Watching for Drops", "Auto claiming/switching for Drops", null, false);
 
-                    function rpl(s) {
-                        return s.toLowerCase().replace(/[^a-z]/g, "");
-                    }
-                    function rpl1st(s) {
-                        return rpl(s.split(" ")[0]);
-                    }
+                    window.fpDrops = window.fpDrops.map((fp) => {
+                        return { ...fp, progress: (msg.percentages.find((percentage) => isSameFpTw(fp, percentage.name)) ?? { percentage: 0 }).percentage };
+                    });
+                    window.remainingDrops = window.fpDrops.filter((fp) => !window.twDrops.some((tw) => isSameFpTw(fp, tw)));
+                    window.remainingDropsLive = window.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
 
-                    remainingDrops = fpDrops.filter((fp) => !twDrops.some((tw) => rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname))));
-                    remainingDropsLive = remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
-
-                    const key = fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
-                    window.currentDrop = remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
-                    if (window.currentDrop) window.currentDrop = { ...window.currentDrop, percentage: msg.percentages.find((obj) => obj.name == window.currentDrop.name).percentage };
+                    const key = window.fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
+                    window.currentDrop = window.remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
+                    //if (window.currentDrop) window.currentDrop = { ...window.currentDrop, percentage: msg.percentages.find((obj) => obj.name == window.currentDrop.name).percentage };
 
                     updatePopup();
 
-                    if (!window.currentDrop && remainingDrops.length > 0) {
-                        if (remainingDropsLive.length > 0) {
-                            location.assign(remainingDropsLive[0].url);
+                    if (!window.currentDrop && window.remainingDrops.length > 0) {
+                        if (window.remainingDropsLive.length > 0) {
+                            location.assign(window.remainingDropsLive[0].url);
                         } else {
-                            sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${remainingDrops.length} Drops remaining`, null, false);
+                            sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${window.remainingDrops.length} Drops remaining`, null, false);
                         }
-                    } else if (!window.currentDrop && remainingDrops.length == 0) {
+                    } else if (!window.currentDrop && window.remainingDrops.length == 0) {
                         if (GM_getValue("claimed", []).includes(key)) {
                             sendNotification("All Drops Claimed!", "Drops have already been claimed!", null, false);
                         } else {
