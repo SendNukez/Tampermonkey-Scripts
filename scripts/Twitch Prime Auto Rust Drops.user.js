@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      1.3.0
+// @version      2.0.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -24,9 +24,6 @@
 // @grant        GM_addStyle
 // ==/UserScript==
 
-const SVG_TOGGLE_DOWN = `<svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg>`;
-const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M5.5 13.5L10 9l4.5 4.5L16 12l-6-6-6 6 1.5 1.5z"></path></g></svg>`;
-
 (async () => {
     "use strict";
 
@@ -40,9 +37,14 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
         id: "Config",
         fields: {
             notifications: {
-                label: "Enable Notifications",
+                label: "Enable Desktop Notifications",
                 type: "checkbox",
                 default: true
+            },
+            popupopen: {
+                label: "Open Popup by default",
+                type: "checkbox",
+                default: false
             }
         }
     });
@@ -123,21 +125,57 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
             GM_addStyle(`
                 .rustdrops-popup {
                     position: absolute;
-                    display: flex;
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    grid-template-rows: auto 1fr;
+                    gap: 1rem 1rem;
+                    grid-template-areas:
+                        "Current Collapse"
+                        "List List";
                     top: 6rem;
                     left: -50px;
-                    padding: 0.5rem;
+                    padding: 1.5rem;
                     width: calc(100% + 100px);
+                    overflow: hidden;
                     background-color: var(--color-background-base);
                     border-radius: var(--border-radius-large);
                     border: var(--border-width-default) solid var(--color-border-base);
                     box-shadow: var(--shadow-elevation-2);
                     color: var(--color-text-base);
+                    transition: height 500ms ease-in;
                 }
 
-                .rustdrops-popup > .inner {
-                    padding: 1rem;
-                    width: 100%;
+                .rustdrops-popup.collapsed {
+                    row-gap: 0px;
+                    transition: height 500ms ease-out;
+                }
+
+                .rustdrops-popup-current {
+                    grid-area: Current;
+                }
+
+                .rustdrops-popup-collapse {
+                    grid-area: Collapse;
+                    margin: auto;
+                    width: 2.4rem;
+                    height: 2.4rem;
+                    border-radius: var(--border-radius-large);
+                    transform: rotate(0deg);
+                    /*transition: transform 250ms ease;*/
+                }
+
+                .rustdrops-popup-collapse:hover {
+                    background-color: var(--color-background-button-text-hover);
+                }
+
+                .rustdrops-popup.collapsed .rustdrops-popup-collapse {
+                    transform: rotate(180deg);
+                }
+
+                .rustdrops-popup-collapse > svg {
+                    display: block;
+                    margin: auto;
+                    fill: var(--color-text-base);
                 }
 
                 .rustdrops-popup .muted {
@@ -171,17 +209,23 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                 .rustdrops-popup-progress-inner {
                     height: 100%;
                     width: 0%;
-                    background: var(--color-background-progress-status);
-                    transition: width ease-in-out 1s;
+                    background-color: var(--color-background-progress-status);
+                    transition: width 1s ease-in-out, color 500ms ease;
                 }
 
                 .rustdrops-popup .rustdrops-popup-list {
-                    width: 100%;
+                    grid-area: List;
+                    display: block;
+                    width: calc(100% - 20px);
                     display: grid;
                     margin: 0px 10px;
-                    margin-top: 5px;
+                    overflow: hidden;
                     grid-template-columns: repeat(2, 1fr);
                     grid-auto-rows: auto;
+                }
+
+                .rustdrops-popup.collapsed .rustdrops-popup-list {
+                    display: none;
                 }
 
                 .rustdrops-popup .rustdrops-popup-list .live,
@@ -200,47 +244,45 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
             `);
 
             $(".top-nav__search-container").append(`
-                <div class="rustdrops-popup">
-                    <div class="inner">
-                        <p>NAME</p>
+                <div class="rustdrops-popup${GM_config.get("popupopen") ? "" : " collapsed"}">
+                    <div class="rustdrops-popup-current">
+                        <p class="rustdrops-popup-name">NAME</p>
                         <div class="rustdrops-popup-progress-container">
                             <div class="rustdrops-popup-progress-text muted">PRECENTAGE</div>
                             <div class="rustdrops-popup-progress-outer"><div class="rustdrops-popup-progress-inner" style="width: 0%;"></div></div>
                         </div>
-                        <div class="rustdrops-popup-list"></div>
                     </div>
+                    <button class="rustdrops-popup-collapse"><svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg></button>
+                    <div class="rustdrops-popup-list"></div>
                 </div>
             `);
+
+            $(".rustdrops-popup-collapse").on("click", (e) => {
+                updatePopup(true);
+            });
 
             window.hasPopup = true;
         }
 
         if (window.currentDrop) {
-            $(".rustdrops-popup > .inner > p").text(window.currentDrop.name);
-            $(".rustdrops-popup-progress-text").text(`${window.currentDrop.progress}%`);
-            $(".rustdrops-popup-progress-inner").attr("style", `width: ${window.currentDrop.progress}%;`);
+            const progress = window.currentDrop.progress;
+            $(".rustdrops-popup-name").text(window.currentDrop.name);
+            $(".rustdrops-popup-progress-text").html(`${progress < 100 ? `${progress}%` : "Done!"}${progress == 100 ? `<i class="fas fa-check-circle" style="color: #00c7ac; margin-left: 5px;"></i>` : ""}`);
+            $(".rustdrops-popup-progress-inner").attr("style", `width: ${progress}%;${progress == 100 ? " background-color: #00c7ac;" : ""}`);
         }
         if (window.fpDrops.length > 0) {
             $(".rustdrops-popup .rustdrops-popup-list").html(
                 window.fpDrops
                     .map((drop) => {
-                        const thisDrop = window.remainingDrops.find((e) => e.name == drop.name);
-                        const claimed = !thisDrop;
-                        const hasProgress = thisDrop && thisDrop.progress > 0;
-                        const live = drop.isLive;
                         if (drop.url == location.href) return "";
-                        if (claimed) return `<div class="small muted">${drop.name}<i class="fas fa-check-circle" style="color: #00c7ac;"></i></div>`;
-                        return `<div class="small">${drop.name}${live ? `<span class="live">LIVE</span>` : ""}${hasProgress ? `<i class="fas fa-adjust" style="color: #ffbb00;"></i>` : ""}</div>`;
+                        if (drop.progress == 100) return `<div class="small muted">${drop.name}<i class="fas fa-check-circle" style="color: #00c7ac;"></i></div>`;
+                        return `<div class="small">${drop.name}${drop.isLive ? `<span class="live">LIVE</span>` : ""}${drop.progress > 0 ? `<i class="fas fa-adjust" style="color: #ffbb00;"></i>` : ""}</div>`;
                     })
                     .join("")
             );
         }
 
-        if (!window.popupShown) {
-            if (toggle) window.popupShown = true;
-        } else {
-            if (toggle) window.popupShown = false;
-        }
+        if (toggle) $(".rustdrops-popup").toggleClass("collapsed");
     }
 
     $(async () => {
@@ -327,25 +369,26 @@ const SVG_TOGGLE_UP = `<svg width="20px" height="20px" version="1.1" viewBox="0 
                 if (msg.type == "TWITCH" && window.fpDrops.length > 0) {
                     if (!alreadyQueried.TWITCH) sendNotification("Watching for Drops", "Auto claiming/switching for Drops", null, false);
 
-                    window.fpDrops = window.fpDrops.map((fp) => {
-                        return { ...fp, progress: (msg.percentages.find((percentage) => isSameFpTw(fp, percentage.name)) ?? { percentage: 0 }).percentage };
-                    });
                     window.remainingDrops = window.fpDrops.filter((fp) => !window.twDrops.some((tw) => isSameFpTw(fp, tw)));
                     window.remainingDropsLive = window.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
+                    window.fpDrops = window.fpDrops.map((fp) => {
+                        const claimed = !window.remainingDrops.find((e) => e.name == fp.name);
+                        return { ...fp, progress: (msg.percentages.find((percentage) => isSameFpTw(fp, percentage.name)) ?? { percentage: claimed ? 100 : 0 }).percentage };
+                    });
 
                     const key = window.fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
-                    window.currentDrop = window.remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
-                    //if (window.currentDrop) window.currentDrop = { ...window.currentDrop, percentage: msg.percentages.find((obj) => obj.name == window.currentDrop.name).percentage };
+                    const currentDrop = window.remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
+                    window.currentDrop = window.fpDrops.find((drop) => new URL(drop.url).pathname == location.pathname);
 
                     updatePopup();
 
-                    if (!window.currentDrop && window.remainingDrops.length > 0) {
+                    if (!currentDrop && window.remainingDrops.length > 0) {
                         if (window.remainingDropsLive.length > 0) {
                             location.assign(window.remainingDropsLive[0].url);
                         } else {
                             sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${window.remainingDrops.length} Drops remaining`, null, false);
                         }
-                    } else if (!window.currentDrop && window.remainingDrops.length == 0) {
+                    } else if (!currentDrop && window.remainingDrops.length == 0) {
                         if (GM_getValue("claimed", []).includes(key)) {
                             sendNotification("All Drops Claimed!", "Drops have already been claimed!", null, false);
                         } else {
