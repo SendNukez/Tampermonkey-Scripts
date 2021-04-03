@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.0.0
+// @version      2.1.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -229,8 +229,10 @@
                 }
 
                 .rustdrops-popup .rustdrops-popup-list .live,
+                .rustdrops-popup .rustdrops-popup-list .p-icon,
                 .rustdrops-popup .rustdrops-popup-list i {
                     margin-left: 5px;
+                    display: inline-block;
                 }
 
                 .rustdrops-popup .rustdrops-popup-list .live {
@@ -240,6 +242,28 @@
                     font-weight: bold;
                     padding: 2px 4px;
                     border-radius: 3px;
+                }
+
+                .rustdrops-popup .rustdrops-popup-list a {
+                    color: var(--color-text-link);
+                }
+
+                .rustdrops-popup .rustdrops-popup-list .p-icon {
+                    position: relative;
+                    overflow: hidden;
+                    border-radius: 50%;
+                    width: 12px;
+                    height: 12px;
+                    border: 2px solid #ffbb00;
+                    margin-bottom: -1px;
+                }
+
+                .rustdrops-popup .rustdrops-popup-list .p-icon > div {
+                    position: absolute;
+                    width: calc(100% + 10px);
+                    left: -5px;
+                    bottom: 0px;
+                    background-color: #ffbb00;
                 }
             `);
 
@@ -274,9 +298,13 @@
             $(".rustdrops-popup .rustdrops-popup-list").html(
                 window.fpDrops
                     .map((drop) => {
+                        const isTwitchDrop = drop.url.includes("twitch.tv");
+                        const creatorName = drop.name.split(" ")[0];
+                        // The REPLACEME is for things like the "Trauzooka" where i can't just replace the first word bc there is only one word
+                        const dropNameWithLink = isTwitchDrop ? (drop.name.split(" ").length <= 1 ? "REPLACEME " + drop.name : drop.name).replace(creatorName, `<a href="${drop.url}">${new URL(drop.url).pathname.toLowerCase()}</a>`) : drop.name;
                         if (drop.url == location.href) return "";
-                        if (drop.progress == 100) return `<div class="small muted">${drop.name}<i class="fas fa-check-circle" style="color: #00c7ac;"></i></div>`;
-                        return `<div class="small">${drop.name}${drop.isLive ? `<span class="live">LIVE</span>` : ""}${drop.progress > 0 ? `<i class="fas fa-adjust" style="color: #ffbb00;"></i>` : ""}</div>`;
+                        if (drop.progress == 100) return `<div title="Done!" class="small muted">${dropNameWithLink}<i class="fas fa-check-circle" style="color: #00c7ac;"></i></div>`;
+                        return `<div title="${drop.progress}%" class="small">${dropNameWithLink}${drop.progress > 0 ? `<div class="p-icon"><div style="height: ${drop.progress}%;"></div></div>` : ""}${drop.isLive ? `<span class="live">LIVE</span>` : ""}</div>`;
                     })
                     .join("")
             );
