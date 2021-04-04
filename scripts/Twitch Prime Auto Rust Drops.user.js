@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.1.0
+// @version      2.2.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -130,7 +130,7 @@
                     grid-template-rows: auto 1fr;
                     gap: 1rem 1rem;
                     grid-template-areas:
-                        "Current Collapse"
+                        "Current Buttons"
                         "List List";
                     top: 6rem;
                     left: -50px;
@@ -154,17 +154,30 @@
                     grid-area: Current;
                 }
 
-                .rustdrops-popup-collapse {
-                    grid-area: Collapse;
+                .rustdrops-popup-buttons {
+                    grid-area: Buttons;
+                    display: grid;
+                    grid-template-rows: 1fr;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 1rem;
+                }
+
+                .rustdrops-popup-buttons > button {
+                    display: flex;
+                    align-items: center;
                     margin: auto;
                     width: 2.4rem;
                     height: 2.4rem;
                     border-radius: var(--border-radius-large);
-                    transform: rotate(0deg);
+                    /*transform: rotate(0deg);*/
                     /*transition: transform 250ms ease;*/
                 }
 
-                .rustdrops-popup-collapse:hover {
+                .rustdrops-popup-buttons > button > * {
+                    margin: auto
+                }
+
+                .rustdrops-popup-buttons > button:hover {
                     background-color: var(--color-background-button-text-hover);
                 }
 
@@ -174,7 +187,6 @@
 
                 .rustdrops-popup-collapse > svg {
                     display: block;
-                    margin: auto;
                     fill: var(--color-text-base);
                 }
 
@@ -276,10 +288,17 @@
                             <div class="rustdrops-popup-progress-outer"><div class="rustdrops-popup-progress-inner" style="width: 0%;"></div></div>
                         </div>
                     </div>
-                    <button class="rustdrops-popup-collapse"><svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg></button>
+                    <div class="rustdrops-popup-buttons">
+                        <button class="rustdrops-popup-refresh"><i class="fas fa-redo" style="font-size: 11px;"></i></button>
+                        <button class="rustdrops-popup-collapse"><svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg></button>
+                    </div>
                     <div class="rustdrops-popup-list"></div>
                 </div>
             `);
+
+            $(".rustdrops-popup-refresh").on("click", (e) => {
+                openQueryTabs();
+            });
 
             $(".rustdrops-popup-collapse").on("click", (e) => {
                 updatePopup(true);
