@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.2.0
+// @version      2.2.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -36,11 +36,11 @@
     GM_config.init({
         id: "Config",
         fields: {
-            notifications: {
+            /*notifications: {
                 label: "Enable Desktop Notifications",
                 type: "checkbox",
                 default: true
-            },
+            },*/
             popupopen: {
                 label: "Open Popup by default",
                 type: "checkbox",
@@ -105,7 +105,7 @@
     }
 
     function sendNotification(title, message, iconUrl, desktopNotification = true) {
-        if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl ?? "https://twitch.facepunch.com/favicon.png");
+        //if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl ?? "https://twitch.facepunch.com/favicon.png");
         // iziToast.show({
         //     title,
         //     message,
