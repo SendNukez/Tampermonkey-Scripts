@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.2.1
+// @version      2.3.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -450,9 +450,29 @@
                 alreadyQueried[msg.type] = true;
             });
 
-            openQueryTabs();
-            window.queryInterval = setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
-            window.reloadTimeout = setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
+            const categoryObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (!mutation.addedNodes) return;
+                    mutation.addedNodes.forEach((node) => {
+                        if ($(node).attr("data-a-target") == "stream-game-link") {
+                            if ($(node).text() == "Rust") {
+                                openQueryTabs();
+                                window.queryInterval = setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
+                                window.reloadTimeout = setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
+                            } else {
+                                const url = new URL(location.href);
+                                url.searchParams.delete("rustdrops");
+                                history.replaceState({}, document.title, url.toString());
+                            }
+                            categoryObserver.disconnect();
+                        }
+                    });
+                });
+            });
+            categoryObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
         }
     });
 })();
