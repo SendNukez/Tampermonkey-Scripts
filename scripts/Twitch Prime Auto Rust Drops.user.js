@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.3.0
+// @version      2.4.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -361,7 +361,7 @@
                 if (tries == 100) location.reload();
                 tries++;
                 await sleep(100);
-            } while ($(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`).length == 0);
+            } while ($(`[data-test-selector="drops-list__wrapper"] > .tw-tower`).length == 0);
             await sleep(100);
 
             let claimed = false;
@@ -375,11 +375,11 @@
             if (claimed) await sleep(4000);
 
             const lang = $(document.documentElement).attr("lang");
-            const percentages = $(`[data-test-selector="DropsCampaignInProgressRewards-container"] > * > .tw-flex`)
+            const percentages = $(`[data-test-selector="DropsCampaignInProgressRewards-container"] > * > *`)
                 .toArray()
-                .filter((e) => $(e).has(".tw-hidden").length == 0)
+                .filter((e) => $(e).children().length != 0)
                 .map((e) => {
-                    return { name: $(e).find(".tw-flex p").text(), percentage: Number($(e).find(`[role="progressbar"]`).attr("aria-valuenow")) };
+                    return { name: $(e).find("p").first().text(), percentage: Number($(e).find(`[role="progressbar"]`).attr("aria-valuenow")) };
                 });
             const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`)
                 .toArray()
@@ -395,10 +395,11 @@
                 })
                 .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text());
 
-            log(drops);
+                log("Drops: ", drops);
+                log("Percentages: ", percentages);
             sendMessage("drops", { type: "TWITCH", drops, percentages });
             window.close();
-        } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9]+$/i.test(location.pathname) && params.has("rustdrops")) {
+        } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9-_]+$/i.test(location.pathname) && params.has("rustdrops")) {
             let alreadyQueried = {};
 
             onMessage("drops", (msg) => {
