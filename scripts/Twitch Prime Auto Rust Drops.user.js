@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.4.1
+// @version      2.4.2
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -320,7 +320,8 @@
                         const isTwitchDrop = drop.url.includes("twitch.tv");
                         const creatorName = drop.name.split(" ")[0];
                         // The REPLACEME is for things like the "Trauzooka" where i can't just replace the first word bc there is only one word
-                        const dropNameWithLink = isTwitchDrop ? (drop.name.split(" ").length <= 1 ? "REPLACEME " + drop.name : drop.name).replace(creatorName, `<a href="${drop.url}">${new URL(drop.url).pathname.toLowerCase()}</a>`) : drop.name;
+                        console.log(drop.name, drop.name.split(" ").length);
+                        const dropNameWithLink = isTwitchDrop ? (drop.name.split(" ").length <= 1 ? "REPLACEME " + drop.name : drop.name).replace(/^\S*/i, `<a href="${drop.url}">${new URL(drop.url).pathname.toLowerCase()}</a>`) : drop.name;
                         if (drop.url == location.href) return "";
                         if (drop.progress == 100) return `<div title="Done!" class="small muted">${dropNameWithLink}<i class="fas fa-check-circle" style="color: #00c7ac;"></i></div>`;
                         return `<div title="${drop.progress}%" class="small">${dropNameWithLink}${drop.progress > 0 ? `<div class="p-icon"><div style="height: ${drop.progress}%;"></div></div>` : ""}${drop.isLive ? `<span class="live">LIVE</span>` : ""}</div>`;
@@ -348,7 +349,7 @@
                     .toArray()
                     .map((name) => {
                         const parent = $(name).closest(".drop");
-                        return { name: $(name).text(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
+                        return { name: $(name).text().trim(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
                     });
 
                 log(drops);
