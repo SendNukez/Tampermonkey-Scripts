@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.4.1
+// @version      2.4.3
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -11,9 +11,7 @@
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js
-// @require      https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min.js
 // @require      https://kit.fontawesome.com/acc839bd0c.js
-// @resource     iziToast https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.min.css
 // @grant        GM_openInTab
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -26,8 +24,6 @@
 
 (async () => {
     "use strict";
-
-    GM_addStyle(GM_getResourceText("iziToast"));
 
     GM_registerMenuCommand("Open Drops Page", () => {
         GM_openInTab("https://twitch.facepunch.com/", { active: true, insert: true });
@@ -106,18 +102,6 @@
 
     function sendNotification(title, message, iconUrl, desktopNotification = true) {
         //if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl ?? "https://twitch.facepunch.com/favicon.png");
-        // iziToast.show({
-        //     title,
-        //     message,
-        //     iconUrl: "https://twitch.facepunch.com/favicon.png",
-        //     color: "#9147ff",
-        //     theme: "dark",
-        //     layout: 2,
-        //     position: "topCenter",
-        //     timeout: 10000,
-        //     transitionIn: "bounceInDown",
-        //     transitionOut: "fadeOutUp"
-        // });
     }
 
     function updatePopup(toggle = false) {
