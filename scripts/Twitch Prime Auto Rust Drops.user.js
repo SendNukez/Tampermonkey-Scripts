@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.4.0
+// @version      2.4.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -381,10 +381,10 @@
                 .map((e) => {
                     return { name: $(e).find("p").first().text(), percentage: Number($(e).find(`[role="progressbar"]`).attr("aria-valuenow")) };
                 });
-            const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > .tw-flex`)
+            const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > *`)
                 .toArray()
                 .filter((e) => {
-                    const agoArr = $(e).find(".tw-c-text-alt-2").first().text().split(" ");
+                    const agoArr = $(e).find("p").first().text().split(" ");
                     let daysAgo = 0;
                     if (lang.startsWith("en-")) {
                         if (agoArr[0] == "yesterday") daysAgo = 1; // yesterday
@@ -393,10 +393,10 @@
                     }
                     return $(e).find(`[data-test-selector="awarded-drop__game-name"]`).text() == "Rust" && daysAgo <= 8;
                 })
-                .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text());
+                .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text().trim());
 
-                log("Drops: ", drops);
-                log("Percentages: ", percentages);
+            log("Drops: ", drops);
+            log("Percentages: ", percentages);
             sendMessage("drops", { type: "TWITCH", drops, percentages });
             window.close();
         } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9-_]+$/i.test(location.pathname) && params.has("rustdrops")) {
