@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.4.4
+// @version      2.5.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -41,6 +41,11 @@
                 label: "Open Popup by default",
                 type: "checkbox",
                 default: false
+            },
+            progressonfp: {
+                label: "Show Progress on the Facepunch Drops Site",
+                type: "checkbox",
+                default: true
             }
         }
     });
@@ -89,9 +94,12 @@
         GM_setValue(label, "MSG_CLEAR");
     }
 
-    function openQueryTabs() {
-        GM_openInTab("https://twitch.facepunch.com/?checkonly", { active: false, insert: true });
-        GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
+    function openQueryTabs(type = "ALL") {
+        if (!type) type = "ALL";
+        type = type.toUpperCase();
+
+        if ((type == "ALL") | (type == "FACEPUNCH")) GM_openInTab("https://twitch.facepunch.com/?checkonly", { active: false, insert: true });
+        if ((type == "ALL") | (type == "TWITCH")) GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
     }
 
     function stop() {
@@ -324,26 +332,96 @@
     $(async () => {
         const params = new URL(location.href).searchParams;
         if (location.host == "twitch.facepunch.com") {
-            $("section.streamer-drops a, section.general-drops a")
-                .removeAttr("target")
-                .map((i, elem) => {
-                    const old = elem.getAttribute("href");
-                    if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
-                    return elem;
-                });
+            if (GM_config.get("progressonfp") && !params.has("checkonly")) {
+                GM_addStyle(`
+                    .drop.is-claimed .drop-footer {
+                        background-color: #003e36 !important;
+                    }
 
-            if (params.has("checkonly")) {
-                const drops = $(".drop-name")
-                    .toArray()
-                    .map((name) => {
-                        const parent = $(name).closest(".drop");
-                        return { name: $(name).text().trim(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
+                    .drop.is-live.is-claimed .drop-footer {
+                        background-color: #00806f !important;
+                    }
+
+                    .drop.in-progress .drop-footer {
+                        background-color: #9e7300 !important;
+                    }
+
+                    .drop.is-live.in-progress .drop-footer {
+                        background-color: #c48f00 !important;
+                    }
+
+                    .drop .drop-name i,
+                    .drop .drop-name .p-icon {
+                        margin-left: 5px;
+                    }
+
+                    .drop .drop-name .p-icon {
+                        display: inline-block;
+                        position: relative;
+                        overflow: hidden;
+                        border-radius: 50%;
+                        width: 1em;
+                        height: 1em;
+                        border: 2px solid #ffbb00;
+                        margin-bottom: -1px;
+                    }
+    
+                    .drop .drop-name .p-icon > div {
+                        position: absolute;
+                        width: calc(100% + 10px);
+                        left: -5px;
+                        bottom: 0px;
+                        background-color: #ffbb00;
+                    }
+                `);
+
+                onMessage("drops", (msg) => {
+                    if (msg.type == "FACEPUNCH") window.fpDrops = msg.drops;
+                    if (msg.type == "TWITCH") window.twDrops = msg.drops;
+                    if (msg.type != "TWITCH") return;
+
+                    window.twDrops = msg.drops;
+                    window.remainingDrops = window.fpDrops.filter((fp) => !window.twDrops.some((tw) => isSameFpTw(fp, tw)));
+                    window.remainingDropsLive = window.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
+                    window.fpDrops = window.fpDrops.map((fp) => {
+                        const claimed = !window.remainingDrops.find((e) => e.name == fp.name);
+                        return { ...fp, progress: (msg.percentages.find((percentage) => isSameFpTw(fp, percentage.name)) ?? { percentage: claimed ? 100 : 0 }).percentage };
                     });
 
-                log(drops);
-                sendMessage("drops", { type: "FACEPUNCH", drops });
-                window.close();
+                    $(".drop")
+                        .toArray()
+                        .forEach((e) => {
+                            const drop = window.fpDrops.find((fp) => fp.name == $(e).find(".drop-name").text());
+
+                            if (drop.progress == 100) {
+                                $(e).addClass("is-claimed");
+                                $(e).find(".drop-name").append(`<i class="fas fa-check-circle" style="color: #00c7ac;"></i>`);
+                            } else if (drop.progress > 0) {
+                                $(e).addClass("in-progress");
+                                $(e).find(".drop-name").append(`<div class="p-icon"><div style="height: ${drop.progress}%;"></div></div>`);
+                            }
+                        });
+                });
+                openQueryTabs("TWITCH");
+                $("section.streamer-drops a, section.general-drops a")
+                    .removeAttr("target")
+                    .map((i, elem) => {
+                        const old = elem.getAttribute("href");
+                        if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
+                        return elem;
+                    });
             }
+
+            const drops = $(".drop-name")
+                .toArray()
+                .map((name) => {
+                    const parent = $(name).closest(".drop");
+                    return { name: $(name).text().trim(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
+                });
+
+            log(drops);
+            sendMessage("drops", { type: "FACEPUNCH", drops });
+            if (params.has("checkonly")) window.close();
         } else if (location.href == "https://www.twitch.tv/drops/inventory?checkonly") {
             let tries = 0;
             do {
