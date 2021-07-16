@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.6.0
+// @version      2.6.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -411,14 +411,15 @@
                         });
                 });
                 openQueryTabs("TWITCH");
-                $("section.streamer-drops a, section.general-drops a")
-                    .removeAttr("target")
-                    .map((i, elem) => {
-                        const old = elem.getAttribute("href");
-                        if (new URL(old).host != "www.youtube.com") elem.setAttribute("href", old + "?rustdrops");
-                        return elem;
-                    });
             }
+
+            $("section.streamer-drops a, section.general-drops a")
+                .removeAttr("target")
+                .map((i, elem) => {
+                    const old = elem.getAttribute("href");
+                    if (new URL(old).host == "www.twitch.tv") elem.setAttribute("href", old + "?rustdrops");
+                    return elem;
+                });
 
             const drops = $(".drop-name")
                 .toArray()
