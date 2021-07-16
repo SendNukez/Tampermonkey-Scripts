@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.5.1
+// @version      2.6.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -12,6 +12,7 @@
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js
 // @require      https://kit.fontawesome.com/acc839bd0c.js
+// @require      https://unpkg.com/string-similarity/umd/string-similarity.min.js
 // @grant        GM_openInTab
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -79,7 +80,7 @@
     }
 
     function isSameFpTw(fp, tw) {
-        return rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname));
+        return rpl(tw) == rpl(fp.name) || rpl1st(tw) == rpl1st(fp.name) || rpl(tw).startsWith(rpl(new URL(fp.url).pathname)) || stringSimilarity.compareTwoStrings(tw, fp.name) >= 0.8;
     }
 
     function onMessage(label, callback) {
@@ -98,8 +99,8 @@
         if (!type) type = "ALL";
         type = type.toUpperCase();
 
-        if ((type == "ALL") | (type == "FACEPUNCH")) GM_openInTab("https://twitch.facepunch.com/?checkonly", { active: false, insert: true });
-        if ((type == "ALL") | (type == "TWITCH")) GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
+        if (type == "ALL" || type == "FACEPUNCH") GM_openInTab("https://twitch.facepunch.com/?checkonly", { active: false, insert: true });
+        if (type == "ALL" || type == "TWITCH") GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
     }
 
     function stop() {
@@ -392,13 +393,20 @@
                         .toArray()
                         .forEach((e) => {
                             const drop = window.fpDrops.find((fp) => fp.name == $(e).find(".drop-name").text());
+                            console.log(e, drop);
 
                             if (drop.progress == 100) {
+                                $(e).attr("title", "Claimed!");
                                 $(e).addClass("is-claimed");
-                                $(e).find(".drop-name").append(`<i class="fas fa-check-circle" style="color: #00c7ac;"></i>`);
+                                if ($(e).find(".fa-check-circle").length == 0) $(e).find(".drop-name").append(`<i class="fas fa-check-circle" style="color: #00c7ac;"></i>`);
                             } else if (drop.progress > 0) {
+                                $(e).attr("title", `${drop.progress}%`);
                                 $(e).addClass("in-progress");
-                                $(e).find(".drop-name").append(`<div class="p-icon"><div style="height: ${drop.progress}%;"></div></div>`);
+                                if ($(e).find(".p-icon").length == 0) {
+                                    $(e).find(".drop-name").append(`<div class="p-icon"><div style="height: ${drop.progress}%;"></div></div>`);
+                                } else {
+                                    $(e).find(".p-icon > div").attr("style", `height: ${drop.progress}%;`);
+                                }
                             }
                         });
                 });
@@ -445,6 +453,7 @@
             const percentages = $(`[data-test-selector="DropsCampaignInProgressRewards-container"] > * > *`)
                 .toArray()
                 .filter((e) => $(e).children().length != 0)
+                .filter((e) => !$(e).find(`[data-test-selector="DropsCampaignInProgressRewardPresentation-progress-section"]`).css("visibility").includes("hidden"))
                 .map((e) => {
                     return { name: $(e).find("p").first().text(), percentage: Number($(e).find(`[role="progressbar"]`).attr("aria-valuenow")) };
                 });
@@ -471,7 +480,7 @@
 
             onMessage("drops", (msg) => {
                 if (window.stopped) return;
-                log("MSG:", msg);
+                log(`${msg.type} MSG: `, msg);
                 if (msg.type == "CLAIMED") sendNotification("Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
                 if (msg.type == "FACEPUNCH") window.fpDrops = msg.drops;
                 if (msg.type == "TWITCH") window.twDrops = msg.drops;
