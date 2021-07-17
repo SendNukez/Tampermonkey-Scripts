@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.6.1
+// @version      2.6.2
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -461,12 +461,22 @@
             const drops = $(`[data-test-selector="drops-list__wrapper"] > .tw-tower > *`)
                 .toArray()
                 .filter((e) => {
-                    const agoArr = $(e).find("p").first().text().split(" ");
+                    const agoArr = $(e).find("p").first().text().toLowerCase().split(" ");
                     let daysAgo = 0;
                     if (lang.startsWith("en-")) {
                         if (agoArr[0] == "yesterday") daysAgo = 1; // yesterday
                         if (agoArr.length == 2) daysAgo = Math.abs(moment().subtract(1, agoArr[1]).diff(moment(), "day")); // last year
                         if (agoArr.length == 3) daysAgo = Math.abs(moment().subtract(agoArr[0], agoArr[1]).diff(moment(), "day")); // 2 days ago
+                    } else if (lang.startsWith("de-")) {
+                        if (agoArr[0] == "gestern") daysAgo = 1;
+                        if (agoArr.join(" ") == "letzten monat") daysAgo = 30;
+                        if (agoArr.join(" ") == "letztes jahr") daysAgo = 365;
+                        if (agoArr.length == 3) {
+                            let unit = "days";
+                            if (agoArr[2] == "monaten") unit = "months";
+                            if (agoArr[2] == "jahren") unit = "years";
+                            daysAgo = Math.abs(moment().subtract(agoArr[1], unit).diff(moment(), "day")); // vor 2 tagen
+                        }
                     }
                     return $(e).find(`[data-test-selector="awarded-drop__game-name"]`).text() == "Rust" && daysAgo <= 8;
                 })
