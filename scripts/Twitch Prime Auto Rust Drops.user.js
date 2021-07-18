@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.6.3
+// @version      2.6.3.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Erik
@@ -274,7 +274,7 @@
 
                 .rustdrops-popup-list .live {
                     line-height: initial;
-                    font-size: 10px;
+                    font-size: 9px;
                     color: white;
                     background-color: red;
                     font-weight: bold;
