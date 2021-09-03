@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.6.6
+// @version      2.7.0
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Send_Nukez
@@ -23,6 +23,20 @@
 // @grant        GM_addStyle
 // ==/UserScript==
 
+var RustAutoDrops = {
+    isLoggedIn: false,
+    isRustCategory: false,
+    hasPopup: false,
+    popupShown: false,
+    currentDrop: null,
+    fpDrops: [],
+    remainingDrops: [],
+    remainingDropsLive: [],
+    queryInterval: null,
+    reloadTimeout: null,
+    stopped: false
+};
+
 (async () => {
     "use strict";
 
@@ -33,11 +47,6 @@
     GM_config.init({
         id: "Config",
         fields: {
-            /*notifications: {
-                label: "Enable Desktop Notifications",
-                type: "checkbox",
-                default: true
-            },*/
             popupopen: {
                 label: "Open Popup by default",
                 type: "checkbox",
@@ -47,6 +56,11 @@
                 label: "Show Progress on the Facepunch Drops Site",
                 type: "checkbox",
                 default: true
+            },
+            debug: {
+                label: "Debug Mode",
+                type: "checkbox",
+                default: false
             }
         }
     });
@@ -54,18 +68,12 @@
         GM_config.open();
     });
 
-    window.hasPopup = false;
-    window.popupShown = false;
-    window.currentDrop = null;
-    window.fpDrops = [];
-    window.remainingDrops = [];
-    window.remainingDropsLive = [];
-    window.queryInterval = null;
-    window.reloadTimeout = null;
-    window.stopped = false;
-
     function log(...data) {
         console.log("%cAuto Rust Drops:", "color: #1e2020; background-color: #cd412b; padding: 2px 5px; border-radius: 5px; font-weight: bold;", ...data);
+    }
+
+    function logDebug(...data) {
+        if (GM_config.get("debug")) console.log("%cDEBUG%cAuto Rust Drops:", "color: #1e2020; background-color: #109909; padding: 2px 5px; border-radius: 5px; font-weight: bold; margin-right: 5px;", "color: #1e2020; background-color: #cd412b; padding: 2px 5px; border-radius: 5px; font-weight: bold;", ...data);
     }
 
     function sleep(ms) {
@@ -103,19 +111,30 @@
         if (type == "ALL" || type == "TWITCH") GM_openInTab("https://www.twitch.tv/drops/inventory?checkonly", { active: false, insert: true });
     }
 
-    function stop() {
-        window.stopped = true;
-        clearInterval(window.queryInterval);
-        clearTimeout(window.reloadTimeout);
+    function start() {
+        if (RustAutoDrops.queryInterval != null) return; // So it dosen't open Query Tabs every time start() is called
+        if (RustAutoDrops.isLoggedIn && RustAutoDrops.isRustCategory) {
+            openQueryTabs();
+            RustAutoDrops.queryInterval = setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
+            RustAutoDrops.reloadTimeout = setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
+        }
     }
 
-    function sendNotification(title, message, iconUrl, desktopNotification = true) {
-        //if (desktopNotification && GM_config.get("notifications")) GM_notification(title, message, iconUrl ?? "https://twitch.facepunch.com/favicon.png");
+    function stop() {
+        RustAutoDrops.stopped = true;
+        clearInterval(RustAutoDrops.queryInterval);
+        clearTimeout(RustAutoDrops.reloadTimeout);
+
+        const url = new URL(location.href);
+        if (url.searchParams.has("rustdrops")) {
+            url.searchParams.delete("rustdrops");
+            history.replaceState({}, document.title, url.toString());
+        }
     }
 
     function updatePopup(toggle = false) {
-        if (!window.hasPopup) {
-            GM_addStyle(`
+        if (!RustAutoDrops.hasPopup) {
+            GM_addStyle(/*css*/ `
                 .rustdrops-popup {
                     position: absolute;
                     display: grid;
@@ -150,8 +169,7 @@
                 .rustdrops-popup-buttons {
                     grid-area: Buttons;
                     display: grid;
-                    grid-template-rows: 1fr;
-                    grid-template-columns: repeat(2, 1fr);
+                    grid-auto-flow: column;
                     gap: 1rem;
                 }
 
@@ -174,11 +192,15 @@
                     background-color: var(--color-background-button-text-hover);
                 }
 
-                .rustdrops-popup.collapsed .rustdrops-popup-collapse {
+                .rustdrops-popup .rustdrops-popup-button-collapse {
                     transform: rotate(180deg);
                 }
 
-                .rustdrops-popup-collapse > svg {
+                .rustdrops-popup.collapsed .rustdrops-popup-button-collapse {
+                    transform: rotate(0deg);
+                }
+
+                .rustdrops-popup-button-collapse > svg {
                     display: block;
                     fill: var(--color-text-base);
                 }
@@ -227,7 +249,7 @@
                     grid-area: List;
                     width: calc(100% - 20px); /* 100% - margin */
                     display: grid;
-                    gap: 5px;
+                    gap: 5px 15px;
                     margin: 0px 10px;
                     padding: 3px 0px; /* for the LIVE badges to on top/bottom not to be cut off bc of overflow: hidden */
                     overflow: hidden;
@@ -302,7 +324,7 @@
                 }
             `);
 
-            $(".top-nav__search-container").append(`
+            $(".top-nav__search-container").append(/*html*/ `
                 <div class="rustdrops-popup${GM_config.get("popupopen") ? "" : " collapsed"}">
                     <div class="rustdrops-popup-current">
                         <p class="rustdrops-popup-name">NAME</p>
@@ -312,33 +334,38 @@
                         </div>
                     </div>
                     <div class="rustdrops-popup-buttons">
-                        <button class="rustdrops-popup-refresh"><i class="fas fa-redo" style="font-size: 11px;"></i></button>
-                        <button class="rustdrops-popup-collapse"><svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg></button>
+                        <button class="rustdrops-popup-button-drops" title="Show List of Drops"><i class="fab fa-dropbox"></i></button>
+                        <button class="rustdrops-popup-button-refresh" title="Refresh"><i class="fas fa-redo" style="font-size: 11px;"></i></button>
+                        <button class="rustdrops-popup-button-collapse" title="Toggle Collapsed"><svg width="20px" height="20px" version="1.1" viewBox="0 0 20 20" x="0px" y="0px"><g><path d="M14.5 6.5L10 11 5.5 6.5 4 8l6 6 6-6-1.5-1.5z"></path></g></svg></button>
                     </div>
                     <div class="rustdrops-popup-list"></div>
                 </div>
             `);
 
-            $(".rustdrops-popup-refresh").on("click", (e) => {
+            $(".rustdrops-popup-button-refresh").on("click", (e) => {
                 openQueryTabs();
             });
 
-            $(".rustdrops-popup-collapse").on("click", (e) => {
+            $(".rustdrops-popup-button-collapse").on("click", (e) => {
                 updatePopup(true);
             });
 
-            window.hasPopup = true;
+            $(".rustdrops-popup-button-drops").on("click", (e) => {
+                GM_openInTab("https://twitch.facepunch.com/", { active: true, insert: true });
+            });
+
+            RustAutoDrops.hasPopup = true;
         }
 
-        if (window.currentDrop) {
-            const progress = window.currentDrop.progress;
-            $(".rustdrops-popup-name").text(window.currentDrop.name);
+        if (RustAutoDrops.currentDrop) {
+            const progress = RustAutoDrops.currentDrop.progress;
+            $(".rustdrops-popup-name").text(RustAutoDrops.currentDrop.name);
             $(".rustdrops-popup-progress-text").html(`${progress < 100 ? `${progress}%` : "Done!"}${progress == 100 ? `<i class="fas fa-check-circle" style="color: #00c7ac; margin-left: 5px;"></i>` : ""}`);
             $(".rustdrops-popup-progress-inner").attr("style", `width: ${progress}%;${progress == 100 ? " background-color: #00c7ac;" : ""}`);
         }
-        if (window.fpDrops.length > 0) {
+        if (RustAutoDrops.fpDrops.length > 0) {
             $(".rustdrops-popup .rustdrops-popup-list").html(
-                window.fpDrops
+                RustAutoDrops.fpDrops
                     .filter((drop) => new URL(drop.url).pathname != location.pathname)
                     .map((drop) => {
                         const isTwitchDrop = drop.url.includes("twitch.tv");
@@ -363,7 +390,7 @@
         const params = new URL(location.href).searchParams;
         if (location.host == "twitch.facepunch.com") {
             if (GM_config.get("progressonfp") && !params.has("checkonly")) {
-                GM_addStyle(`
+                GM_addStyle(/*css*/ `
                     .drop.is-claimed .drop-footer {
                         background-color: #003e36 !important;
                     }
@@ -406,23 +433,22 @@
                 `);
 
                 onMessage("drops", (msg) => {
-                    if (msg.type == "FACEPUNCH") window.fpDrops = msg.drops;
-                    if (msg.type == "TWITCH") window.twDrops = msg.drops;
+                    if (msg.type == "FACEPUNCH") RustAutoDrops.fpDrops = msg.drops;
+                    if (msg.type == "TWITCH") RustAutoDrops.twDrops = msg.drops;
                     if (msg.type != "TWITCH") return;
 
-                    window.twDrops = msg.drops;
-                    window.remainingDrops = window.fpDrops.filter((fp) => !window.twDrops.some((tw) => isSameFpTw(fp, tw)));
-                    window.remainingDropsLive = window.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
-                    window.fpDrops = window.fpDrops.map((fp) => {
-                        const claimed = !window.remainingDrops.find((e) => e.name == fp.name);
+                    RustAutoDrops.twDrops = msg.drops;
+                    RustAutoDrops.remainingDrops = RustAutoDrops.fpDrops.filter((fp) => !RustAutoDrops.twDrops.some((tw) => isSameFpTw(fp, tw)));
+                    RustAutoDrops.remainingDropsLive = RustAutoDrops.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
+                    RustAutoDrops.fpDrops = RustAutoDrops.fpDrops.map((fp) => {
+                        const claimed = !RustAutoDrops.remainingDrops.find((e) => e.name == fp.name);
                         return { ...fp, progress: (msg.percentages.find((percentage) => isSameFpTw(fp, percentage.name)) ?? { percentage: claimed ? 100 : 0 }).percentage };
                     });
 
                     $(".drop")
                         .toArray()
                         .forEach((e) => {
-                            const drop = window.fpDrops.find((fp) => fp.name == $(e).find(".drop-name").text());
-                            console.log(e, drop);
+                            const drop = RustAutoDrops.fpDrops.find((fp) => fp.name == $(e).find(".drop-name").text());
 
                             if (drop.progress == 100) {
                                 $(e).attr("title", "Claimed!");
@@ -457,7 +483,7 @@
                     return { name: $(name).text().trim(), url: parent.attr("href"), isTwitch: !parent.hasClass("generic"), isLive: parent.hasClass("is-live") };
                 });
 
-            log(drops);
+            logDebug(drops);
             sendMessage("drops", { type: "FACEPUNCH", drops });
             if (params.has("checkonly")) window.close();
         } else if (location.href == "https://www.twitch.tv/drops/inventory?checkonly") {
@@ -511,52 +537,53 @@
                 })
                 .map((e) => $(e).find(`[data-test-selector="awarded-drop__drop-name"]`).text().trim());
 
-            log("Drops: ", drops);
-            log("Percentages: ", percentages);
+            logDebug("Drops: ", drops);
+            logDebug("Percentages: ", percentages);
             sendMessage("drops", { type: "TWITCH", drops, percentages });
             window.close();
+            close();
         } else if (location.host == "www.twitch.tv" && /^\/[a-z0-9-_]+$/i.test(location.pathname) && params.has("rustdrops")) {
             let alreadyQueried = {};
 
             onMessage("drops", (msg) => {
-                if (window.stopped) return;
-                log(`${msg.type} MSG: `, msg);
-                if (msg.type == "CLAIMED") sendNotification("Drop Claimed!", `Claimed ${msg.name}!`, msg.image);
-                if (msg.type == "FACEPUNCH") window.fpDrops = msg.drops;
-                if (msg.type == "TWITCH") window.twDrops = msg.drops;
+                if (RustAutoDrops.stopped) return;
+                logDebug(`${msg.type} MSG: `, msg);
+                if (msg.type == "CLAIMED") log(`Claimed ${msg.name}!`);
+                if (msg.type == "FACEPUNCH") RustAutoDrops.fpDrops = msg.drops;
+                if (msg.type == "TWITCH") RustAutoDrops.twDrops = msg.drops;
 
-                if (msg.type == "FACEPUNCH" && window.fpDrops.length == 0) {
-                    sendNotification("No Drops Available", "Didn't find any Drops", null, false);
+                if (msg.type == "FACEPUNCH" && RustAutoDrops.fpDrops.length == 0) {
+                    log("No Drops Available");
                     stop();
                 }
 
-                if (msg.type == "TWITCH" && window.fpDrops.length > 0) {
-                    if (!alreadyQueried.TWITCH) sendNotification("Watching for Drops", "Auto claiming/switching for Drops", null, false);
+                if (msg.type == "TWITCH" && RustAutoDrops.fpDrops.length > 0) {
+                    if (!alreadyQueried.TWITCH) log("Watching for Drops...");
 
-                    window.remainingDrops = window.fpDrops.filter((fp) => !window.twDrops.some((tw) => isSameFpTw(fp, tw)));
-                    window.remainingDropsLive = window.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
-                    window.fpDrops = window.fpDrops.map((fp) => {
-                        const claimed = !window.remainingDrops.find((e) => e.name == fp.name);
+                    RustAutoDrops.remainingDrops = RustAutoDrops.fpDrops.filter((fp) => !RustAutoDrops.twDrops.some((tw) => isSameFpTw(fp, tw)));
+                    RustAutoDrops.remainingDropsLive = RustAutoDrops.remainingDrops.filter((drop) => drop.isTwitch && drop.isLive);
+                    RustAutoDrops.fpDrops = RustAutoDrops.fpDrops.map((fp) => {
+                        const claimed = !RustAutoDrops.remainingDrops.find((e) => e.name == fp.name);
                         return { ...fp, progress: (msg.percentages.find((percentage) => isSameFpTw(fp, percentage.name)) ?? { percentage: claimed ? 100 : 0 }).percentage };
                     });
 
-                    const key = window.fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
-                    const currentDrop = window.remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
-                    window.currentDrop = window.fpDrops.find((drop) => new URL(drop.url).pathname == location.pathname);
+                    const key = RustAutoDrops.fpDrops.map((fp) => new URL(fp.url).pathname.substring(1)).join("-");
+                    const currentDrop = RustAutoDrops.remainingDropsLive.find((drop) => new URL(drop.url).pathname == location.pathname);
+                    RustAutoDrops.currentDrop = RustAutoDrops.fpDrops.find((drop) => new URL(drop.url).pathname == location.pathname);
 
                     updatePopup();
 
-                    if (!currentDrop && window.remainingDrops.length > 0) {
-                        if (window.remainingDropsLive.length > 0) {
-                            location.assign(window.remainingDropsLive[0].url);
+                    if (!currentDrop && RustAutoDrops.remainingDrops.length > 0) {
+                        if (RustAutoDrops.remainingDropsLive.length > 0) {
+                            location.assign(RustAutoDrops.remainingDropsLive[0].url);
                         } else {
-                            sendNotification("Nobody Online :(", `It seems like nobody with Drops is online. ${window.remainingDrops.length} Drops remaining`, null, false);
+                            log(`It seems like nobody with Drops is online. ${RustAutoDrops.remainingDrops.length} Drops remaining`);
                         }
-                    } else if (!currentDrop && window.remainingDrops.length == 0) {
+                    } else if (!currentDrop && RustAutoDrops.remainingDrops.length == 0) {
                         if (GM_getValue("claimed", []).includes(key)) {
-                            sendNotification("All Drops Claimed!", "Drops have already been claimed!", null, false);
+                            log("Drops have already been claimed!");
                         } else {
-                            sendNotification("All Drops Claimed!", "All Drops have been claimed!");
+                            log("All Drops Claimed!");
                             GM_setValue("claimed", [...GM_getValue("claimed", []), key]);
                         }
 
@@ -569,21 +596,24 @@
 
             const categoryObserver = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
-                    if (!mutation.addedNodes) return;
-                    mutation.addedNodes.forEach((node) => {
-                        if ($(node).attr("data-a-target") == "stream-game-link") {
-                            if ($(node).text() == "Rust") {
-                                openQueryTabs();
-                                window.queryInterval = setInterval(openQueryTabs, 5 * 60000); // Check for Drops every 5min
-                                window.reloadTimeout = setTimeout(location.reload, 30 * 60000); // Reload every 30min (Just to make sure Stream is Running)
-                            } else {
-                                const url = new URL(location.href);
-                                url.searchParams.delete("rustdrops");
-                                history.replaceState({}, document.title, url.toString());
+                    if (mutation.target != null && mutation.target.nodeName.toLowerCase() == "body" && $(mutation.target).hasClass("logged-in")) {
+                        RustAutoDrops.isLoggedIn = true;
+                        start();
+                    }
+                    if (mutation.addedNodes) {
+                        mutation.addedNodes.forEach((node) => {
+                            if ($(node).attr("data-a-target") == "stream-game-link") {
+                                if ($(node).text() == "Rust") {
+                                    RustAutoDrops.isRustCategory = true;
+                                    start();
+                                } else {
+                                    stop();
+                                }
                             }
-                            categoryObserver.disconnect();
-                        }
-                    });
+                        });
+                    }
+
+                    if (RustAutoDrops.isLoggedIn && RustAutoDrops.isRustCategory) categoryObserver.disconnect();
                 });
             });
             categoryObserver.observe(document.body, {
