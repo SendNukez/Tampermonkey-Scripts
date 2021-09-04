@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Prime Auto Rust Drops
 // @homepage     https://twitch.facepunch.com/
-// @version      2.7.0
+// @version      2.7.1
 // @downloadURL  https://github.com/ErikS270102/Tampermonkey-Scripts/raw/master/scripts/Twitch%20Prime%20Auto%20Rust%20Drops.user.js
 // @description  Automatically switches to Rust Streamers that have Drops enabled if url has the "drops" parameter set. (Just klick on a Streamer on https://twitch.facepunch.com/)
 // @author       Send_Nukez
@@ -163,7 +163,28 @@ var RustAutoDrops = {
                 }
 
                 .rustdrops-popup-current {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
                     grid-area: Current;
+                }
+
+                .rustdrops-popup-name-container {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                }
+
+                .rustdrops-popup-name-container .live {
+                    height: 100%;
+                    line-height: initial;
+                    font-size: 12px;
+                    color: white;
+                    background-color: red;
+                    font-weight: bold;
+                    padding: 1px 2px;
+                    margin-left: 5px;
+                    border-radius: 3px;
                 }
 
                 .rustdrops-popup-buttons {
@@ -265,8 +286,7 @@ var RustAutoDrops = {
                     width: fit-content;
                     height: 1.2em;
                     line-height: 1.2em;
-                    display: grid; 
-                    grid-auto-flow: column;
+                    display: flex;
                     gap: 5px; 
                 }
 
@@ -281,8 +301,7 @@ var RustAutoDrops = {
                 }
 
                 .rustdrops-popup-list .badges {
-                    display: grid;
-                    grid-auto-flow: column;
+                    display: flex;
                     gap: 5px;
                 }
 
@@ -327,7 +346,7 @@ var RustAutoDrops = {
             $(".top-nav__search-container").append(/*html*/ `
                 <div class="rustdrops-popup${GM_config.get("popupopen") ? "" : " collapsed"}">
                     <div class="rustdrops-popup-current">
-                        <p class="rustdrops-popup-name">NAME</p>
+                        <div class="rustdrops-popup-name-container"><p class="rustdrops-popup-name">NAME</p><span class="live">LIVE</span></div>
                         <div class="rustdrops-popup-progress-container">
                             <div class="rustdrops-popup-progress-text muted">PRECENTAGE</div>
                             <div class="rustdrops-popup-progress-outer"><div class="rustdrops-popup-progress-inner" style="width: 0%;"></div></div>
@@ -359,6 +378,7 @@ var RustAutoDrops = {
 
         if (RustAutoDrops.currentDrop) {
             const progress = RustAutoDrops.currentDrop.progress;
+            $(".rustdrops-popup-name-container .live").css("display", RustAutoDrops.currentDrop.isLive ? "inherit" : "none");
             $(".rustdrops-popup-name").text(RustAutoDrops.currentDrop.name);
             $(".rustdrops-popup-progress-text").html(`${progress < 100 ? `${progress}%` : "Done!"}${progress == 100 ? `<i class="fas fa-check-circle" style="color: #00c7ac; margin-left: 5px;"></i>` : ""}`);
             $(".rustdrops-popup-progress-inner").attr("style", `width: ${progress}%;${progress == 100 ? " background-color: #00c7ac;" : ""}`);
